@@ -174,6 +174,12 @@ class Start_Agentflow implements INode {
         if (_flowState) {
             try {
                 flowStateArray = typeof _flowState === 'string' ? JSON.parse(_flowState) : _flowState
+
+                // If the provided flow state is an object map (e.g. { "foo": "bar" }),
+                // convert it on-the-fly into the expected array format
+                if (!Array.isArray(flowStateArray) && typeof flowStateArray === 'object') {
+                    flowStateArray = Object.entries(flowStateArray).map(([key, value]) => ({ key, value }))
+                }
             } catch (error) {
                 throw new Error('Invalid Flow State')
             }
