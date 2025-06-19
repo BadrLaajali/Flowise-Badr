@@ -1367,6 +1367,55 @@ export const executeAgentFlow = async ({
         agentflowRuntime.state = previousState
     }
 
+    /**
+     * Merge overrideConfig.startState into runtime state
+     * - Accepts both array form ([{ key, value }]) and object map form ({ key: value })
+     * - Does not mutate existing keys unless overridden by startState
+     */
+    if (overrideConfig && Object.prototype.hasOwnProperty.call(overrideConfig, 'startState')) {
+        try {
+            let startStateObj: ICommonObject = {}
+            const rawStartState = overrideConfig.startState as any
+
+            if (Array.isArray(rawStartState)) {
+                // Convert array of key/value objects into map
+                for (const item of rawStartState) {
+                    if (item && typeof item === 'object' && 'key' in item) {
+                        startStateObj[item.key] = (item as any).value
+                    }
+                }
+            } else if (typeof rawStartState === 'string') {
+                // Attempt to parse when stringified JSON
+                try {
+                    const parsed = JSON.parse(rawStartState)
+                    if (Array.isArray(parsed)) {
+                        for (const item of parsed) {
+                            if (item && typeof item === 'object' && 'key' in item) {
+                                startStateObj[item.key] = (item as any).value
+                            }
+                        }
+                    } else if (typeof parsed === 'object') {
+                        startStateObj = parsed
+                    }
+                } catch (e) {
+                    logger.warn(`⚠️ Unable to parse startState string: ${e}`)
+                }
+            } else if (typeof rawStartState === 'object' && rawStartState !== null) {
+                startStateObj = rawStartState as ICommonObject
+            }
+
+            if (Object.keys(startStateObj).length) {
+                agentflowRuntime.state = {
+                    ...agentflowRuntime.state,
+                    ...startStateObj
+                }
+                logger.debug(`  🏁 Merged startState into runtime: ${JSON.stringify(startStateObj)}`)
+            }
+        } catch (mergeErr) {
+            logger.warn(`⚠️ Error merging startState override: ${getErrorMessage(mergeErr)}`)
+        }
+    }
+
     // If the start input type is form input, get the form values from the previous execution (form values are persisted in the same session)
     if (startInputType === 'formInput' && previousExecution) {
         const previousExecutionData = (JSON.parse(previousExecution.executionData) as IAgentflowExecutedData[]) ?? []
